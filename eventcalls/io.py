@@ -82,7 +82,8 @@ class DatagramReader(InputStream):
         self.buffersize = 1024
 
     def read_single(self):
-        return self.__endpoint.recv(self.buffersize)
+        """calls recvfrom() using the attached endpoint."""
+        return self.__endpoint.recvfrom(self.buffersize)
 
     def close(self):
         self.__endpoint.close()

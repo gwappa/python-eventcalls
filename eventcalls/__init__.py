@@ -110,7 +110,7 @@ class Routine:
 
     def run(self):
         """runs its EventSource object."""
-        status = self.source.initialize()
+        status = self.source.setup()
         self.handler.initialized(status)
 
         try:
@@ -128,3 +128,5 @@ class Routine:
         """cancels its underlying EventSource routine, and joins its thread."""
         self.source.cancel()
         self.__thread.join()
+
+from . import io
