@@ -34,6 +34,7 @@ class InputStream(_EventSource):
     - `read_single()`: reads a message (can be in any form) and returns it.
     - `close()`: closes the endpoint.
     """
+    DEFAULT_TIMEOUT_SEC = None
 
     def __init__(self):
         super().__init__()
@@ -68,11 +69,13 @@ class DatagramReader(InputStream):
     """
 
     @classmethod
-    def bind(cls, host, port, buffersize=1024):
+    def bind(cls, port, buffersize=1024):
         """creates a Reader using a listening port
         bound to the specified host and port."""
-        endpoint = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
-        endpoint.bind((host, port))
+        endpoint = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM, _socket.IPPROTO_UDP)
+        endpoint.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+        endpoint.settimeout(cls.DEFAULT_TIMEOUT_SEC)
+        endpoint.bind(('localhost', port))
         return cls(endpoint, buffersize=buffersize)
 
     def __init__(self, endpoint, buffersize=1024):
