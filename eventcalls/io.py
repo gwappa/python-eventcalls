@@ -44,7 +44,7 @@ class InputStream(_EventSource):
         try:
             while True:
                 yield self.read_single()
-        except OSError:
+        except:
             if not self.__canceled.is_set():
                 raise
 
@@ -111,6 +111,7 @@ try:
             return cls(endpoint, line_oriented=line_oriented)
 
         def __init__(self, endpoint, line_oriented=True):
+            super().__init__()
             self.__endpoint      = endpoint
             self.__line_oriented = line_oriented
 
@@ -122,10 +123,10 @@ try:
             self.__endpoint.write(data)
 
         def read_single(self):
-            msg = b''
+            msg = self.__endpoint.read(1)
             if self.__line_oriented == False:
-                return self.__endpoint.read(1)
-            while msg[-1] != b'\n':
+                return msg
+            while not msg.endswith(b'\n'):
                 msg = msg + self.__endpoint.read(1)
             return msg
 
