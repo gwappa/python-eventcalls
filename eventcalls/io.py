@@ -56,7 +56,7 @@ class InputStream(_EventSource):
         except OSError:
             pass
 
-class DatagramReader(InputStream):
+class DatagramIO(InputStream):
     """an EventSource that keeps reading from the paired UDP endpoint.
     the endpoint can be either listening socket, or the one used for
     sending packets.
@@ -84,21 +84,54 @@ class DatagramReader(InputStream):
         self.__endpoint = endpoint
         self.buffersize = 1024
 
+    def write(self, data):
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        self.__endpoint.write(data)
+
     def read_single(self):
         """calls recvfrom() using the attached endpoint."""
         return self.__endpoint.recvfrom(self.buffersize)
 
     def close(self):
         self.__endpoint.close()
+        self.__endpoint = None
 
 try:
-    import serial as _serial
+    import serial as _serial # pyserial
 
-    class SerialReader(_EventSource):
+    class SerialIO(InputStream):
         """an event source that keeps reading from the paired serial port.
         this class is available only when PySerial (or a `serial` module) is
         properly installed.
         """
-        pass
+        @classmethod
+        def open(cls, addr, line_oriented=True, **kwargs):
+            endpoint = _serial.Serial(addr, **kwargs)
+            return cls(endpoint, line_oriented=line_oriented)
+
+        def __init__(self, endpoint, line_oriented=True):
+            self.__endpoint      = endpoint
+            self.__line_oriented = line_oriented
+
+        def write(self, data):
+            if isinstance(data, str):
+                data = str.encode('utf-8')
+            if (self.__line_oriented == True) and (data[-1] != b'\n'):
+                data = data + b'\r\n'
+            self.__endpoint.write(data)
+
+        def read_single(self):
+            msg = b''
+            if self.__line_oriented == False:
+                return self.__endpoint.read(1)
+            while msg[-1] != b'\n':
+                msg = msg + self.__endpoint.read(1)
+            return msg
+
+        def close(self):
+            self.__endpoint.close()
+            self.__endpoint = None
+
 except ImportError:
     pass
