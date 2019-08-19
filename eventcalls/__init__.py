@@ -26,7 +26,7 @@ import threading as _threading
 
 """eventcalls -- a threaded way for achieving event callbacks."""
 
-VERSION_STR = "1.0"
+VERSION_STR = "1.0.1a1"
 
 class EventSource:
     """the interface for an event generator."""

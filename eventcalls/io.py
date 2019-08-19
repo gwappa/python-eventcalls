@@ -94,8 +94,9 @@ class DatagramIO(InputStream):
         return self.__endpoint.recvfrom(self.buffersize)
 
     def close(self):
-        self.__endpoint.close()
-        self.__endpoint = None
+        if self.__endpoint:
+            self.__endpoint.close()
+            self.__endpoint = None
 
 try:
     import serial as _serial # pyserial
