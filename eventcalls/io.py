@@ -76,13 +76,17 @@ class DatagramIO(InputStream):
         endpoint.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
         endpoint.settimeout(cls.DEFAULT_TIMEOUT_SEC)
         endpoint.bind(('localhost', port))
-        return cls(endpoint, buffersize=buffersize)
+        return cls(endpoint, buffersize=buffersize, port=port)
 
-    def __init__(self, endpoint, buffersize=1024):
+    def __init__(self, endpoint, buffersize=1024, port="(unknown)"):
         """endpoint: datagram port to read from"""
         super().__init__()
+        self.__port     = port
         self.__endpoint = endpoint
         self.buffersize = 1024
+
+    def __repr__(self):
+        return f"DatagramIO(port={self.__port})"
 
     def write(self, data):
         if isinstance(data, str):
@@ -91,7 +95,11 @@ class DatagramIO(InputStream):
 
     def read_single(self):
         """calls recvfrom() using the attached endpoint."""
-        return self.__endpoint.recvfrom(self.buffersize)
+        try:
+            return self.__endpoint.recvfrom(self.buffersize)
+        except OSError:
+            self.__endpoint = None
+            raise
 
     def close(self):
         if self.__endpoint:

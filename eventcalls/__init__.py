@@ -23,10 +23,12 @@
 #
 
 import threading as _threading
+from traceback import print_exc as _print_exc
 
 """eventcalls -- a threaded way for achieving event callbacks."""
 
-VERSION_STR = "1.0.1a1"
+VERSION_STR = "1.0.1a2"
+DETAILED_ERROR = False
 
 class EventSource:
     """the interface for an event generator."""
@@ -100,29 +102,46 @@ class Routine:
         self.source   = src
         self.handler  = handler
         self.__thread = _threading.Thread(target=self.run)
+        self.__running = False
         if start == True:
             self.__thread.start()
+            self.__running = True
 
     def start(self):
         """starts the thread, if not yet."""
         if not self.__thread.is_alive():
             self.__thread.start()
+            self.__running = True
 
     def run(self):
         """runs its EventSource object."""
         status = self.source.setup()
         self.handler.initialized(status)
 
+        status = None
         try:
             for evt in self.source:
                 self.handler.handle(evt)
+        except OSError as e:
+            if DETAILED_ERROR == True:
+                print("***error in reading from {self.source}:")
+                _print_exc()
+            else:
+                print(f"***failed to read from source for {self.source}: {e}")
+            status = e
+            self.__running = False
         finally:
             try:
-                status = self.source.finalize()
+                self.source.finalize()
+                self.__running = False
             except Exception as e:
                 status = e
+                self.__running = False
             finally:
                 self.handler.done(status)
+
+    def is_running(self):
+        return self.__running
 
     def stop(self):
         """cancels its underlying EventSource routine, and joins its thread."""
