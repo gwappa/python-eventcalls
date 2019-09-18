@@ -110,13 +110,14 @@ class DatagramIO(InputStream):
     def read_single(self):
         """calls recvfrom() using the attached endpoint."""
         try:
-            events = self.__selector.select(self.timeout)
-            if self.canceled:
-                self.close()
-                raise StreamIsClosed(f"UDP port {self.__port}")
-            for key, mask in events:
-                if key.data == 'ready':
-                    return self.__endpoint.recvfrom(self.buffersize)
+            while True:
+                events = self.__selector.select(self.timeout)
+                if self.canceled:
+                    self.close()
+                    raise StreamIsClosed(f"UDP port {self.__port}")
+                for key, mask in events:
+                    if key.data == 'ready':
+                        return self.__endpoint.recvfrom(self.buffersize)
         except OSError:
             self.__endpoint = None
             raise
