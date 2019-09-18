@@ -25,6 +25,11 @@
 from . import EventSource as _EventSource
 import socket as _socket
 import threading as _threading
+import selectors as _selectors
+
+class StreamIsClosed(OSError):
+    def __init__(self, msg):
+        super().__init__(msg)
 
 class InputStream(_EventSource):
     """an EventSource that keeps reading from the underlying endpoint.
@@ -40,12 +45,18 @@ class InputStream(_EventSource):
         super().__init__()
         self.__canceled = _threading.Event()
 
+    def __getattr__(self, name):
+        if name == 'canceled':
+            return self.__canceled.is_set()
+        else:
+            return super().__getattr__(name)
+
     def __iter__(self):
         try:
             while True:
                 yield self.read_single()
         except:
-            if not self.__canceled.is_set():
+            if not self.canceled:
                 raise
 
     def cancel(self):
@@ -67,6 +78,7 @@ class DatagramIO(InputStream):
     the size of the buffer can be changed using the `buffersize` parameter
     on initialization.
     """
+    timeout = .5 # 0.5-sec timeout for `select` call
 
     @classmethod
     def bind(cls, port, buffersize=1024):
@@ -83,6 +95,8 @@ class DatagramIO(InputStream):
         super().__init__()
         self.__port     = port
         self.__endpoint = endpoint
+        self.__selector = _selectors.DefaultSelector()
+        self.__selector.register(self.__endpoint, _selectors.EVENT_READ, 'ready')
         self.buffersize = 1024
 
     def __repr__(self):
@@ -96,15 +110,24 @@ class DatagramIO(InputStream):
     def read_single(self):
         """calls recvfrom() using the attached endpoint."""
         try:
-            return self.__endpoint.recvfrom(self.buffersize)
+            events = self.__selector.select(self.timeout)
+            if self.canceled:
+                self.close()
+                raise StreamIsClosed(f"UDP port {self.__port}")
+            for key, mask in events:
+                if key.data == 'ready':
+                    return self.__endpoint.recvfrom(self.buffersize)
         except OSError:
             self.__endpoint = None
             raise
 
     def close(self):
         if self.__endpoint:
-            self.__endpoint.close()
-            self.__endpoint = None
+            try:
+                self.__endpoint.close()
+                self.__endpoint = None
+            except OSError:
+                pass
 
 try:
     import serial as _serial # pyserial
@@ -140,8 +163,11 @@ try:
             return msg
 
         def close(self):
-            self.__endpoint.close()
-            self.__endpoint = None
+            try:
+                self.__endpoint.close()
+                self.__endpoint = None
+            except OSError:
+                pass
 
 except ImportError:
     pass
