@@ -64,7 +64,9 @@ class InputStream(_EventSource):
         # close the endpoint anyway
         try:
             self.close()
-        except OSError:
+        except OSError: # can occur in case of OSX
+            pass
+        except AttributeError: # can occur in case of Windows
             pass
 
 class DatagramIO(InputStream):
@@ -146,6 +148,7 @@ try:
         def __init__(self, endpoint, line_oriented=True):
             super().__init__()
             self.__endpoint      = endpoint
+            self.__endpoint.timeout = .1
             self.__line_oriented = line_oriented
 
         def write(self, data):
@@ -156,11 +159,22 @@ try:
             self.__endpoint.write(data)
 
         def read_single(self):
-            msg = self.__endpoint.read(1)
+            msg = None
+            while msg is None:
+                msg = self.__endpoint.read(1)
+                if self.canceled:
+                    self.close()
+                    raise StreamIsClosed(f"Serial port {self.__endpoint.name}")
             if self.__line_oriented == False:
                 return msg
             while not msg.endswith(b'\n'):
-                msg = msg + self.__endpoint.read(1)
+                c   = self.__endpoint.read(1)
+                if self.canceled:
+                    self.close()
+                    raise StreamIsClosed(f"Serial port {self.__endpoint.name}")
+                if c is None:
+                    return msg
+                msg = msg + c
             return msg
 
         def close(self):
