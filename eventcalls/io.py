@@ -148,6 +148,7 @@ try:
         def __init__(self, endpoint, line_oriented=True):
             super().__init__()
             self.__endpoint      = endpoint
+            self.__transact      = _threading.Lock()
             self.__endpoint.timeout = .1
             self.__line_oriented = line_oriented
 
@@ -156,7 +157,8 @@ try:
                 data = str.encode('utf-8')
             if (self.__line_oriented == True) and (data[-1] != b'\n'):
                 data = data + b'\r\n'
-            self.__endpoint.write(data)
+            with self.__transact:
+                self.__endpoint.write(data)
 
         def read_single(self):
             msg = None

@@ -27,7 +27,7 @@ from traceback import print_exc as _print_exc
 
 """eventcalls -- a threaded way for achieving event callbacks."""
 
-VERSION_STR = "1.0.1a4"
+VERSION_STR = "1.0.2"
 DETAILED_ERROR = False
 
 class EventSource:
