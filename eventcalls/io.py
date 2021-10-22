@@ -158,7 +158,7 @@ try:
         # override(Writable)
         def write(self, data):
             if isinstance(data, str):
-                data = str.encode('utf-8')
+                data = data.encode('utf-8')
             if (self.__line_oriented == True) and (data[-1] != b'\n'):
                 data = data + b'\r\n'
             with self.__transact:
