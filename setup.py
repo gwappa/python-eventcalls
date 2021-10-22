@@ -1,10 +1,9 @@
 
 import setuptools
-from eventcalls import VERSION_STR
 
 setuptools.setup(
     name='eventcalls',
-    version=VERSION_STR,
+    version="1.0.2",
     description='a threaded way for achieving event callbacks',
     url='',
     author='Keisuke Sehara',
