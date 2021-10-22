@@ -22,10 +22,13 @@
 # SOFTWARE.
 #
 
-from . import EventSource as _EventSource
 import socket as _socket
 import threading as _threading
 import selectors as _selectors
+
+from . import EventSource as _EventSource, \
+              Writable as _Writable, \
+              LOGGER as _LOGGER
 
 class StreamIsClosed(OSError):
     def __init__(self, msg):
@@ -45,12 +48,6 @@ class InputStream(_EventSource):
         super().__init__()
         self.__canceled = _threading.Event()
 
-    def __getattr__(self, name):
-        if name == 'canceled':
-            return self.__canceled.is_set()
-        else:
-            return super().__getattr__(name)
-
     def __iter__(self):
         try:
             while True:
@@ -69,7 +66,11 @@ class InputStream(_EventSource):
         except AttributeError: # can occur in case of Windows
             pass
 
-class DatagramIO(InputStream):
+    @property
+    def canceled(self):
+        return self.__canceled.is_set()
+
+class DatagramIO(InputStream, _Writable):
     """an EventSource that keeps reading from the paired UDP endpoint.
     the endpoint can be either listening socket, or the one used for
     sending packets.
@@ -99,16 +100,18 @@ class DatagramIO(InputStream):
         self.__endpoint = endpoint
         self.__selector = _selectors.DefaultSelector()
         self.__selector.register(self.__endpoint, _selectors.EVENT_READ, 'ready')
-        self.buffersize = 1024
+        self.buffersize = buffersize
 
     def __repr__(self):
         return f"DatagramIO(port={self.__port})"
 
+    # override(Writable)
     def write(self, data):
         if isinstance(data, str):
             data = data.encode('utf-8')
         self.__endpoint.write(data)
 
+    # override(InputStream)
     def read_single(self):
         """calls recvfrom() using the attached endpoint."""
         try:
@@ -124,6 +127,7 @@ class DatagramIO(InputStream):
             self.__endpoint = None
             raise
 
+    # override(EventSource)
     def close(self):
         if self.__endpoint:
             try:
@@ -135,23 +139,23 @@ class DatagramIO(InputStream):
 try:
     import serial as _serial # pyserial
 
-    class SerialIO(InputStream):
+    class SerialIO(InputStream, _Writable):
         """an event source that keeps reading from the paired serial port.
         this class is available only when PySerial (or a `serial` module) is
         properly installed.
         """
         @classmethod
-        def open(cls, addr, line_oriented=True, **kwargs):
-            endpoint = _serial.Serial(addr, **kwargs)
+        def open(cls, addr, line_oriented=True, timeout=0.1, **kwargs):
+            endpoint = _serial.Serial(addr, timeout=timeout, **kwargs)
             return cls(endpoint, line_oriented=line_oriented)
 
         def __init__(self, endpoint, line_oriented=True):
             super().__init__()
             self.__endpoint      = endpoint
             self.__transact      = _threading.Lock()
-            self.__endpoint.timeout = .1
             self.__line_oriented = line_oriented
 
+        # override(Writable)
         def write(self, data):
             if isinstance(data, str):
                 data = str.encode('utf-8')
@@ -160,6 +164,7 @@ try:
             with self.__transact:
                 self.__endpoint.write(data)
 
+        # override(InputStream)
         def read_single(self):
             msg = None
             while msg is None:
@@ -179,6 +184,7 @@ try:
                 msg = msg + c
             return msg
 
+        # override(EventSource)
         def close(self):
             try:
                 self.__endpoint.close()
@@ -187,4 +193,4 @@ try:
                 pass
 
 except ImportError:
-    pass
+    _LOGGER.info("install 'pyserial' to make SerialIO available.")

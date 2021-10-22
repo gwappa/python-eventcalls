@@ -22,13 +22,19 @@
 # SOFTWARE.
 #
 
+import logging as _logging
 import threading as _threading
 from traceback import print_exc as _print_exc
 
 """eventcalls -- a threaded way for achieving event callbacks."""
 
-VERSION_STR = "1.0.2"
+VERSION_STR = "1.0.3"
 DETAILED_ERROR = False
+
+_logging.basicConfig(level=_logging.INFO,
+                     format="[%(asctime)s %(name)s] %(levelname)s: %(message)s")
+LOGGER = _logging.getLogger(__name__)
+LOGGER.setLevel(_logging.INFO)
 
 class EventSource:
     """the interface for an event generator."""
@@ -64,6 +70,12 @@ class EventSource:
         """
         pass
 
+class Writable:
+    """the interface for a writable EventSource."""
+    def write(self, data):
+        """writes `data` to its endpoint."""
+        pass
+
 class EventHandler:
     """the interface for an event handler.
     EventHandler subclasses can be made to implement a protocol.
@@ -88,6 +100,17 @@ class EventHandler:
         """
         pass
 
+
+class EventHandlerProxy(EventHandler):
+    """the EventHandler object to be used with fixed callback functions."""
+    def __init__(self, fhandle=None, finit=None, fdone=None):
+        if finit is not None:
+            self.initialized = finit
+        if fhandle is not None:
+            self.handle = fhandle
+        if fdone is not None:
+            self.done = fdone
+
 class Routine:
     """the class implemented with the thread loop for event generation."""
     def __init__(self, src, handler, start=True):
@@ -99,13 +122,21 @@ class Routine:
         handler -- a EventHandler object.
         start   -- whether to start the thread immediately.
         """
-        self.source   = src
-        self.handler  = handler
-        self.__thread = _threading.Thread(target=self.run)
+        self._source   = src
+        self._handler  = handler
+        self.__thread  = _threading.Thread(target=self.run)
         self.__running = False
         if start == True:
             self.__thread.start()
             self.__running = True
+
+    @property
+    def source(self):
+        return self._source
+
+    @property
+    def handler(self):
+        return self._handler
 
     def start(self):
         """starts the thread, if not yet."""
@@ -124,10 +155,10 @@ class Routine:
                 self.handler.handle(evt)
         except OSError as e:
             if DETAILED_ERROR == True:
-                print("***error in reading from {self.source}:")
+                LOGGER.error("***error in reading from {self.source}:")
                 _print_exc()
             else:
-                print(f"***failed to read from source for {self.source}: {e}")
+                LOGGER.error(f"***failed to read from source for {self.source}: {e}")
             status = e
             self.__running = False
         finally:
@@ -142,6 +173,14 @@ class Routine:
 
     def is_running(self):
         return self.__running
+
+    def write(self, data):
+        """passes `data` to its underlying `EventSource`.
+        raises AttributeError if the `EventSource` object is not `Writable`."""
+        if isinstance(self.source, Writable):
+            self.source.write(data)
+        else:
+            raise AttributeError(f"source {self.source} does not seem to be writable")
 
     def stop(self):
         """cancels its underlying EventSource routine, and joins its thread."""

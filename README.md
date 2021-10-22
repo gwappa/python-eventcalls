@@ -31,13 +31,19 @@ All the I/O functionality comes with the `eventcalls.EventSource` interface.
 The default I/O includes:
 
 - `eventcalls.io.DatagramIO`: for UDP communication
-- `eventcalls.io.SerialIO`: for serial communication
+- `eventcalls.io.SerialIO`: for serial communication (requires `pyserial`)
 
 ## Routine
 
 The `eventcalls.Routine` class wraps the `EventSource` and manages the I/O routines.
 It runs a python thread internally to keep reading data from the underlying `EventSource`,
 while accepting the `write` method calls to write data into it.
+
+- `Routine.start()`: starts the underlying event thread (if not yet started).
+- `Routine.stop()`: closes the underlying `EventSource`, and stops running the event thread.
+- `Routine.is_running()`: returns `True` if the underlying thread is running.
+- `Routine.write(data)`: attempts to write data (binary or string) into the endpoint.
+  Note this method _never_ checks whether the endpoint is (still) open or not.
 
 ## EventHandler
 
@@ -53,9 +59,8 @@ The interface includes several one-argument methods:
   `evt` is `None` by default, but may contain an exception instance in case the I/O was closed because of an error.
 
 You can set your handler to the `Routine` instance upon initialization.
-Note it only accepts one single `Handler` instance.
+Note it only accepts one single `Handler` instance for a single `Routine` object.
 
 ## License
 
-The MIT license
-
+(c) 2019 Keisuke Sehara, the MIT license
