@@ -3,7 +3,7 @@ import setuptools
 
 setuptools.setup(
     name='eventcalls',
-    version="1.0.2",
+    version="1.0.4",
     description='a threaded way for achieving event callbacks',
     url='',
     author='Keisuke Sehara',
